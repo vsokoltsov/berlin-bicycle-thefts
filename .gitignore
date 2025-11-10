@@ -7,7 +7,9 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+.mypy_cache/
+.ruff_cache/
 
 data/external/
 data/interim/
