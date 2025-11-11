@@ -6,6 +6,8 @@ dist/
 wheels/
 *.egg-info
 
+.DS_store
+
 # Virtual environments
 .venv/
 .mypy_cache/
