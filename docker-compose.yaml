@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: bicycle-thefts-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+    restart: unless-stopped
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ml
+    container_name: ml-notebooks
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    environment:
+      - NB_UID=${NB_UID}
+      - NB_GID=${NB_GID}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN}
+      - JUPYTER_ENABLE_LAB=yes
+      - PLOMBER_DISABLE_JUPYTER=1
+      - TZ=Europe/Berlin
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./data:/app/data
+      - ./:/app
+    command:
+      - uv
+      - run
+      - jupyter
+      - lab
+      - --ip=0.0.0.0
+      - --port=8888
+      - --no-browser
+      - --ServerApp.root_dir=/app/notebooks
+      - --ServerApp.token=
+      - --ServerApp.password=
+      - --ServerApp.allow_origin=*
+      - --ServerApp.disable_check_xsrf=True
+      - --ServerApp.allow_root=True
+    restart: unless-stopped
