@@ -12,6 +12,7 @@ wheels/
 .venv/
 .mypy_cache/
 .ruff_cache/
+.ipynb_checkpoints/
 
 data/external/
 data/interim/
