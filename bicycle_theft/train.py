@@ -12,6 +12,7 @@ from .features import FeatureManager
 
 from .config import PROCESSED_DATA
 
+
 @click.command()
 @click.option(
     "--force",
@@ -28,21 +29,21 @@ def train(force: bool) -> None:
     df_full = feature_manager.build_causal(df)
     print("Casual features were build")
     test_days = 60
-    gap_days  = 0
-    date_col  = "date" if "date" in df.columns else "start_date"
+    gap_days = 0
+    date_col = "date" if "date" in df.columns else "start_date"
 
-    d    = pd.to_datetime(df[date_col]).dt.normalize()
+    d = pd.to_datetime(df[date_col]).dt.normalize()
     last = d.max()
-    gap  = pd.Timedelta(days=gap_days)
+    gap = pd.Timedelta(days=gap_days)
 
     test_start = last - pd.Timedelta(days=test_days) + pd.Timedelta(days=1)
-    train_end  = test_start - pd.Timedelta(days=1) - gap
+    train_end = test_start - pd.Timedelta(days=1) - gap
 
     m_train = d <= train_end
-    m_test  = d >= test_start
+    m_test = d >= test_start
 
     df_train = df_full.loc[m_train].copy()
-    df_test  = df_full.loc[m_test].copy()
+    df_test = df_full.loc[m_test].copy()
 
     feature_manager.fit(df_train)
     print("Features were fitted")
@@ -51,12 +52,26 @@ def train(force: bool) -> None:
 
     print("Dataframes were transformed")
 
-    X_train = X_train.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
-    X_test = X_test.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
-    
-    zero_like_tokens = ["y_lag","y_roll","y_diff","zero_streak",
-                    "spatial_lag","_roll7_prev","_roll28_prev","rate_prev_mean"]
-    zero_like_cols = [c for c in X_train.columns if any(tok in c for tok in zero_like_tokens)]
+    X_train = X_train.apply(pd.to_numeric, errors="coerce").replace(
+        [np.inf, -np.inf], np.nan
+    )
+    X_test = X_test.apply(pd.to_numeric, errors="coerce").replace(
+        [np.inf, -np.inf], np.nan
+    )
+
+    zero_like_tokens = [
+        "y_lag",
+        "y_roll",
+        "y_diff",
+        "zero_streak",
+        "spatial_lag",
+        "_roll7_prev",
+        "_roll28_prev",
+        "rate_prev_mean",
+    ]
+    zero_like_cols = [
+        c for c in X_train.columns if any(tok in c for tok in zero_like_tokens)
+    ]
     X_train[zero_like_cols] = X_train[zero_like_cols].fillna(0.0)
     X_test[zero_like_cols] = X_test[zero_like_cols].fillna(0.0)
 
@@ -75,12 +90,10 @@ def train(force: bool) -> None:
 
     print("Save train and test dataframes to parquet...")
     X_train.to_parquet(
-        os.path.join(PROCESSED_DATA, 'X_train.geoparquet.gzip'),
-        compression='gzip'
+        os.path.join(PROCESSED_DATA, "X_train.geoparquet.gzip"), compression="gzip"
     )
     X_test.to_parquet(
-        os.path.join(PROCESSED_DATA, 'X_train.geoparquet.gzip'),
-        compression='gzip'
+        os.path.join(PROCESSED_DATA, "X_train.geoparquet.gzip"), compression="gzip"
     )
     print("Dataframes are saved!")
 
@@ -88,7 +101,9 @@ def train(force: bool) -> None:
     X_test = X_test[feature_manager.columns]
 
     dtrain = lgb.Dataset(X_train, label=rate_train, feature_name=list(X_train.columns))
-    dtest = lgb.Dataset(X_test, label=rate_test, reference=dtrain, feature_name=list(X_train.columns))
+    dtest = lgb.Dataset(
+        X_test, label=rate_test, reference=dtrain, feature_name=list(X_train.columns)
+    )
 
     with open(os.path.join(PROCESSED_DATA, "best_model_params.json"), "r") as f:
         best_params = json.load(f)
@@ -96,23 +111,24 @@ def train(force: bool) -> None:
     with open(os.path.join(PROCESSED_DATA, "preproc.json"), "r") as f:
         preproc_params = json.load(f)
 
-    best_n = preproc_params.get('best_iteration', 2827)
+    best_n = preproc_params.get("best_iteration", 2827)
     print("PREPROC PARAMS ARE", preproc_params)
     gbm_final = lgb.train(
         best_params,
         dtrain,
         num_boost_round=best_n,
-        valid_sets=[dtrain, dtest], valid_names=["train", "test"],
-        callbacks=[
-                lgb.log_evaluation(period=500)
-        ],
+        valid_sets=[dtrain, dtest],
+        valid_names=["train", "test"],
+        callbacks=[lgb.log_evaluation(period=500)],
     )
 
     rate_pred_test = gbm_final.predict(X_test, num_iteration=best_n)
-    cnt_pred_test  = np.clip(rate_pred_test, 0, None) * pop_test / 1000.0
-    print("Validation (COUNT)  MAE/RMSE:",
-      mean_absolute_error(y_test, cnt_pred_test),
-      mean_squared_error(y_test, cnt_pred_test) ** 0.5)
+    cnt_pred_test = np.clip(rate_pred_test, 0, None) * pop_test / 1000.0
+    print(
+        "Validation (COUNT)  MAE/RMSE:",
+        mean_absolute_error(y_test, cnt_pred_test),
+        mean_squared_error(y_test, cnt_pred_test) ** 0.5,
+    )
 
     print("Saving model...")
     artifacts = {
@@ -122,12 +138,13 @@ def train(force: bool) -> None:
         "best_iteration": best_n,
     }
     gbm_final.save_model(
-        os.path.join(PROCESSED_DATA, 'bike_thefts_lgbm.pkl'),
-        num_iteration=gbm_final.best_iteration
+        os.path.join(PROCESSED_DATA, "bike_thefts_lgbm.pkl"),
+        num_iteration=gbm_final.best_iteration,
     )
     with open(os.path.join(PROCESSED_DATA, "preproc.json"), "w") as f:
         json.dump(artifacts, f, ensure_ascii=False, indent=2)
     print("Model is saved!")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     train()

@@ -7,11 +7,7 @@ import requests
 from pathlib import Path
 from shapely.geometry import Point
 
-from .config import (
-    EXTERNAL_DATA_PATH,
-    INTERIM_DATA_PATH,
-    RAW_DATA_PATH
-)
+from .config import EXTERNAL_DATA_PATH, INTERIM_DATA_PATH, RAW_DATA_PATH
 
 
 def _file_exists(path: str) -> bool:
@@ -31,19 +27,21 @@ class BicycleThefts:
             return pd.read_parquet(self.OUTPUT_FILE_NAME)
 
         df = pd.read_csv(self.INPUT_FILE_NAME, encoding="cp1252")
-        df.columns = pd.Index([
-            "created_at",
-            "start_date",
-            "start_hour",
-            "end_date",
-            "end_hour",
-            "lor",
-            "price",
-            "attempt",
-            "bicycle_type",
-            "group",
-            "type",
-        ])
+        df.columns = pd.Index(
+            [
+                "created_at",
+                "start_date",
+                "start_hour",
+                "end_date",
+                "end_hour",
+                "lor",
+                "price",
+                "attempt",
+                "bicycle_type",
+                "group",
+                "type",
+            ]
+        )
         for column in ["created_at", "start_date", "end_date"]:
             df[column] = pd.to_datetime(df[column], errors="coerce")
 
@@ -187,7 +185,6 @@ class Weather:
         open_meteo_df.rename(columns={"time": "date"}, inplace=True)
         return open_meteo_df
 
-
     def forecast(self) -> pd.DataFrame:
         params: dict[str, str | float] = {
             "latitude": 52.52,
@@ -212,7 +209,7 @@ class Weather:
         open_meteo_df["time"] = pd.to_datetime(open_meteo_df["time"])
         open_meteo_df.rename(columns={"time": "date"}, inplace=True)
         return open_meteo_df
- 
+
 
 class Population:
     INPUT_FILE_NAME = os.path.join(RAW_DATA_PATH, "population.csv")
@@ -380,7 +377,7 @@ def load_full_dataset(force: bool = False) -> gpd.GeoDataFrame:
     if not force and _file_exists(output_file):
         print(f"File {output_file} already exist")
         return gpd.read_parquet(output_file)
-    
+
     df = BicycleThefts.load(force)
 
     geo_df = LORMaps.load(force)

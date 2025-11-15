@@ -26,7 +26,9 @@ def predict(items: str, force: bool) -> None:
     try:
         items_json: List[PredictItem] = adapter.validate_json(items)
     except json.JSONDecodeError:
-        raise click.ClickException("Invalid argument format. Expecting json string.Example:'[{\"lor\":\"10100205\",\"date\":\"2025-11-14\"}]'")
+        raise click.ClickException(
+            'Invalid argument format. Expecting json string.Example:\'[{"lor":"10100205","date":"2025-11-14"}]\''
+        )
 
     # Load artifacts and model
     with open(os.path.join(PROCESSED_DATA, "preproc.json"), "r") as f:
@@ -34,10 +36,7 @@ def predict(items: str, force: bool) -> None:
 
     model = lgb.Booster(model_file=MODEL_PATH)
 
-    predictor = Predictor(
-        model=model,
-        artifacts=artifacts
-    )
+    predictor = Predictor(model=model, artifacts=artifacts)
     df = predictor.build(items_json)
     result = predictor.predict(df)
 
@@ -50,7 +49,7 @@ def predict(items: str, force: bool) -> None:
                 "date": item.date.strftime("%Y-%m-%d"),
                 "rate_hat_per_1000": item.rate_hat_per_1000,
                 "count_hat": item.count_hat,
-                "count_int": item.count_int
+                "count_int": item.count_int,
             }
             for item in result
         ],
@@ -58,5 +57,5 @@ def predict(items: str, force: bool) -> None:
     print(json.dumps(out, ensure_ascii=False, indent=2))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     predict()
