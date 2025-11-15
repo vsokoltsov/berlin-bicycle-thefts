@@ -121,7 +121,9 @@ class LORMaps:
 
 
 class Weather:
-    SOURCE = "https://archive-api.open-meteo.com/v1/archive"
+    START_DATE = "2024-01-01"
+    ARCHIVE_SOURCE = "https://archive-api.open-meteo.com/v1/archive"
+    FORECAST_SOURCE = "https://api.open-meteo.com/v1/forecast"
     OUTPUT_FILE_PATH = os.path.join(EXTERNAL_DATA_PATH, "open_meteo.parquet.gzip")
 
     @classmethod
@@ -130,7 +132,6 @@ class Weather:
             print(f"File {self.OUTPUT_FILE_PATH} already exist")
             return pd.read_parquet(self.OUTPUT_FILE_PATH)
 
-        url = "https://archive-api.open-meteo.com/v1/archive"
         params: dict[str, str | float] = {
             "latitude": 52.52,
             "longitude": 13.405,
@@ -148,7 +149,7 @@ class Weather:
             ),
             "timezone": "Europe/Berlin",
         }
-        j = requests.get(url, params=params, timeout=60).json()
+        j = requests.get(self.ARCHIVE_SOURCE, params=params, timeout=60).json()
         open_meteo_df = pd.DataFrame(j["daily"])
         if "sunshine_duration" in open_meteo_df:
             open_meteo_df["sunshine_h"] = open_meteo_df["sunshine_duration"] / 3600.0
@@ -159,6 +160,58 @@ class Weather:
         )
         return open_meteo_df
 
+    def before_date(self, end_date: str) -> pd.DataFrame:
+        params: dict[str, str | float] = {
+            "latitude": 52.52,
+            "longitude": 13.405,
+            "start_date": self.START_DATE,
+            "end_date": end_date,
+            "daily": ",".join(
+                [
+                    "temperature_2m_mean",
+                    "temperature_2m_min",
+                    "temperature_2m_max",
+                    "precipitation_sum",
+                    "wind_speed_10m_max",
+                    "sunshine_duration",
+                ]
+            ),
+            "timezone": "Europe/Berlin",
+        }
+        j = requests.get(self.ARCHIVE_SOURCE, params=params, timeout=60).json()
+        open_meteo_df = pd.DataFrame(j["daily"])
+        if "sunshine_duration" in open_meteo_df:
+            open_meteo_df["sunshine_h"] = open_meteo_df["sunshine_duration"] / 3600.0
+        open_meteo_df["time"] = pd.to_datetime(open_meteo_df["time"])
+        open_meteo_df.rename(columns={"time": "date"}, inplace=True)
+        return open_meteo_df
+
+
+    def forecast(self) -> pd.DataFrame:
+        params: dict[str, str | float] = {
+            "latitude": 52.52,
+            "longitude": 13.405,
+            "forecast_days": 16,
+            "daily": ",".join(
+                [
+                    "temperature_2m_mean",
+                    "temperature_2m_min",
+                    "temperature_2m_max",
+                    "precipitation_sum",
+                    "wind_speed_10m_max",
+                    "sunshine_duration",
+                ]
+            ),
+            "timezone": "Europe/Berlin",
+        }
+        j = requests.get(self.FORECAST_SOURCE, params=params, timeout=60).json()
+        open_meteo_df = pd.DataFrame(j["daily"])
+        if "sunshine_duration" in open_meteo_df:
+            open_meteo_df["sunshine_h"] = open_meteo_df["sunshine_duration"] / 3600.0
+        open_meteo_df["time"] = pd.to_datetime(open_meteo_df["time"])
+        open_meteo_df.rename(columns={"time": "date"}, inplace=True)
+        return open_meteo_df
+ 
 
 class Population:
     INPUT_FILE_NAME = os.path.join(RAW_DATA_PATH, "population.csv")
@@ -322,6 +375,11 @@ def load_data(force: bool) -> None:
 
 
 def load_full_dataset(force: bool = False) -> gpd.GeoDataFrame:
+    output_file = os.path.join(INTERIM_DATA_PATH, "df_geo_etl.geoparquet.gzip")
+    if not force and _file_exists(output_file):
+        print(f"File {output_file} already exist")
+        return gpd.read_parquet(output_file)
+    
     df = BicycleThefts.load(force)
 
     geo_df = LORMaps.load(force)
