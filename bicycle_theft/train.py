@@ -10,8 +10,7 @@ import click
 from .dataset import load_full_dataset
 from .features import FeatureManager
 
-DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
-PROCESSED_DATA = os.path.join(DATA_PATH, "processed")
+from .config import PROCESSED_DATA
 
 @click.command()
 @click.option(

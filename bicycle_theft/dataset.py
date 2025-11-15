@@ -7,10 +7,11 @@ import requests
 from pathlib import Path
 from shapely.geometry import Point
 
-DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
-EXTERNAL_DATA_PATH = os.path.join(DATA_PATH, "external")
-INTERIM_DATA_PATH = os.path.join(DATA_PATH, "interim")
-RAW_DATA_PATH = os.path.join(DATA_PATH, "raw")
+from .config import (
+    EXTERNAL_DATA_PATH,
+    INTERIM_DATA_PATH,
+    RAW_DATA_PATH
+)
 
 
 def _file_exists(path: str) -> bool:

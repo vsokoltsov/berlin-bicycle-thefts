@@ -15,7 +15,7 @@ from .features import FeatureManager
 from .models import PredictItem, PredictionResult
 from dataclasses import dataclass, field
 
-HIST_DAYS = 35
+from .config import HIST_DAYS
 
 @dataclass
 class Predictor:

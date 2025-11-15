@@ -7,12 +7,8 @@ from pydantic import TypeAdapter
 
 from .models import PredictItem
 from .predictor import Predictor
+from .config import PROCESSED_DATA, MODEL_PATH
 
-DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
-PROCESSED_DATA = os.path.join(DATA_PATH, "processed")
-MODEL_PATH = os.path.join(PROCESSED_DATA, "bike_thefts_lgbm.pkl")
-
-HIST_DAYS = 35
 
 @click.command()
 @click.argument("items", nargs=1)
