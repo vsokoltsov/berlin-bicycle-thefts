@@ -33,7 +33,8 @@ The target is a non-negative count with many zeros and strong seasonality. Forec
 * [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) - for traffic density
 
 
-## [Interactive map](./reports/eda_thefts_per_lor_map.html)
+## [Interactive map](https://vsokoltsov.github.io/berlin-bicycle-thefts/reports/eda_thefts_per_lor_map.html)
+
 
 ## Model selection
 
