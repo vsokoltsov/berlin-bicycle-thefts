@@ -179,7 +179,7 @@ def train(force: bool) -> None:
             json.dump(best_params, f, ensure_ascii=False, indent=2)
         best_n = int(study.best_trial.user_attrs.get("best_iteration"))
         preproc_params = {
-            "feature_columns": list(X_trval.columns),
+            "feature_columns": list(X_train.columns),
             "median_imputer": imp.to_dict(),
             "zero_like_cols": zero_like_cols,
             "best_iteration": best_n,
