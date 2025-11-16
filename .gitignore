@@ -17,3 +17,4 @@ wheels/
 data/external/*
 data/interim/*
 data/processed/*
+!data/**/.gitkeep
