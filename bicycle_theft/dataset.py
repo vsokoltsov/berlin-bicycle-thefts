@@ -10,15 +10,17 @@ from shapely.geometry import Point
 from .config import EXTERNAL_DATA_PATH, INTERIM_DATA_PATH, RAW_DATA_PATH
 
 
-def _file_exists(path: str) -> bool:
+def _file_exists(path: Path) -> bool:
     return Path(path).is_file()
 
 
 class BicycleThefts:
-    INPUT_FILE_NAME = os.path.join(RAW_DATA_PATH, "Bicycle Theft Data.csv")
-    OUTPUT_FILE_NAME = os.path.join(
-        INTERIM_DATA_PATH, "bicycle_theft_utf8.parquet.gzip"
+    INPUT_FILE_NAME = os.path.join(
+        RAW_DATA_PATH, "Bicycle Theft Data.csv"
     )
+    OUTPUT_FILE_NAME = Path(os.path.join(
+        INTERIM_DATA_PATH, "bicycle_theft_utf8.parquet.gzip"
+    ))
 
     @classmethod
     def load(self, force: bool = False) -> pd.DataFrame:
@@ -82,13 +84,14 @@ class BicycleThefts:
             .str.replace(r"\D", "", regex=True)
             .str.zfill(8)
         )
+        self.OUTPUT_FILE_NAME.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(self.OUTPUT_FILE_NAME, index=False, compression="gzip")
         return df
 
 
 class LORMaps:
     SOURCE_URL = "https://tsb-opendata.s3.eu-central-1.amazonaws.com/lor_planungsgraeume_2021/lor_planungsraeume_2021.geojson"
-    OUTPUT_FILE_PATH = os.path.join(EXTERNAL_DATA_PATH, "geo_data.geoparquet.gzip")
+    OUTPUT_FILE_PATH = Path(os.path.join(EXTERNAL_DATA_PATH, "geo_data.geoparquet.gzip"))
 
     @classmethod
     def load(self, force: bool = False) -> gpd.GeoDataFrame:
@@ -115,6 +118,7 @@ class LORMaps:
             "12": "Reinickendorf",
         }
         gdf["bez_name"] = gdf["BEZ"].astype(str).str.zfill(2).map(bez_map)
+        self.OUTPUT_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         gdf.to_parquet(self.OUTPUT_FILE_PATH, compression="gzip")
         return gdf
 
@@ -123,7 +127,7 @@ class Weather:
     START_DATE = "2024-01-01"
     ARCHIVE_SOURCE = "https://archive-api.open-meteo.com/v1/archive"
     FORECAST_SOURCE = "https://api.open-meteo.com/v1/forecast"
-    OUTPUT_FILE_PATH = os.path.join(EXTERNAL_DATA_PATH, "open_meteo.parquet.gzip")
+    OUTPUT_FILE_PATH = Path(os.path.join(EXTERNAL_DATA_PATH, "open_meteo.parquet.gzip"))
 
     @classmethod
     def load(self, force: bool = False) -> pd.DataFrame:
@@ -154,6 +158,7 @@ class Weather:
             open_meteo_df["sunshine_h"] = open_meteo_df["sunshine_duration"] / 3600.0
         open_meteo_df["time"] = pd.to_datetime(open_meteo_df["time"])
         open_meteo_df.rename(columns={"time": "created_at"}, inplace=True)
+        self.OUTPUT_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         open_meteo_df.to_parquet(
             os.path.join(self.OUTPUT_FILE_PATH), compression="gzip"
         )
@@ -213,7 +218,7 @@ class Weather:
 
 class Population:
     INPUT_FILE_NAME = os.path.join(RAW_DATA_PATH, "population.csv")
-    OUTPUT_FILE_PATH = os.path.join(INTERIM_DATA_PATH, "population.parquet.gzip")
+    OUTPUT_FILE_PATH = Path(os.path.join(INTERIM_DATA_PATH, "population.parquet.gzip"))
 
     @classmethod
     def load(self, force: bool = False) -> pd.DataFrame:
@@ -254,14 +259,14 @@ class Population:
         columns_to_rename
         population_df = population_df.rename(columns=columns_to_rename)[columns]
         population_df = population_df.fillna(0.0)
-        population_df
+        self.OUTPUT_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         population_df.to_parquet(self.OUTPUT_FILE_PATH, compression="gzip")
         return population_df
 
 
 class TrafficDensity:
     SOURCE = "https://overpass-api.de/api/interpreter"
-    OUTPUT_FILE_PATH = os.path.join(EXTERNAL_DATA_PATH, "traffic_density.parquet.gzip")
+    OUTPUT_FILE_PATH = Path(os.path.join(EXTERNAL_DATA_PATH, "traffic_density.parquet.gzip"))
 
     @classmethod
     def load(self, df_geo: gpd.GeoDataFrame, force: bool = False) -> pd.DataFrame:
@@ -354,6 +359,7 @@ class TrafficDensity:
         poi_density["poi_density_km2"] = (
             poi_density["poi_cnt"] / poi_density["area_km2"]
         )
+        self.OUTPUT_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         poi_density.to_parquet(self.OUTPUT_FILE_PATH, compression="gzip")
         return poi_density
 
@@ -373,7 +379,7 @@ def load_data(force: bool) -> None:
 
 
 def load_full_dataset(force: bool = False) -> gpd.GeoDataFrame:
-    output_file = os.path.join(INTERIM_DATA_PATH, "df_geo_etl.geoparquet.gzip")
+    output_file = Path(os.path.join(INTERIM_DATA_PATH, "df_geo_etl.geoparquet.gzip"))
     if not force and _file_exists(output_file):
         print(f"File {output_file} already exist")
         return gpd.read_parquet(output_file)
@@ -394,8 +400,9 @@ def load_full_dataset(force: bool = False) -> gpd.GeoDataFrame:
     traffic_df = TrafficDensity.load(df_geo, force)
     df_geo = df_geo.join(traffic_df, on="lor")
     gdf = gpd.GeoDataFrame(df_geo, geometry="geometry", crs=geo_df.crs or 25833)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     gdf.to_parquet(
-        os.path.join(INTERIM_DATA_PATH, "df_geo_etl.geoparquet.gzip"),
+        output_file,
         compression="gzip",
     )
     return df_geo

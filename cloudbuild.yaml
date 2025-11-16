@@ -1,0 +1,17 @@
+substitutions:
+  _TAG: 'latest'
+  _REPO: 'bike-thefts'  # заранее созданный репозиторий AR в europe-west3
+steps:
+- name: gcr.io/cloud-builders/docker
+  env:
+  - DOCKER_BUILDKIT=1
+  - BUILDKIT_PROGRESS=plain
+  args:
+    - build
+    - --platform=linux/amd64
+    - --target=api
+    - -t
+    - europe-west3-docker.pkg.dev/$PROJECT_ID/${_REPO}/bike-thefts-api:${_TAG}
+    - .
+images:
+- europe-west3-docker.pkg.dev/$PROJECT_ID/${_REPO}/bike-thefts-api:${_TAG}

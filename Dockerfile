@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -26,17 +27,22 @@ WORKDIR /app
 
 COPY . /app
 
-RUN uv sync --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen
 
 FROM base AS api
 
-EXPOSE 8000
+RUN mkdir -p /app/data/processed
+COPY ["data/raw/Bicycle Theft Data.csv", "/app/data/raw/Bicycle Theft Data.csv"]
 
-CMD ["uv", "run", "uvicorn", "bicycle_theft.api:api", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+COPY data/raw/population.csv /app/data/raw/population.csv
+COPY data/processed/preproc.json /app/data/processed/preproc.json
+COPY data/processed/bike_thefts_lgbm.pkl /app/data/processed/bike_thefts_lgbm.pkl
+
+EXPOSE 8080
+
+ENV UV_NO_SYNC=1
+CMD ["sh", "-c", "python -m bicycle_theft.api --host 0.0.0.0 --port ${PORT:-8080}"]
 
 FROM base AS ml
 
 EXPOSE 8888
-
-# Ставим Jupyter без изменения зависимостей проекта
-# RUN /opt/venv/bin/pip install --no-cache-dir jupyterlab ipykernel

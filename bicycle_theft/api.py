@@ -50,7 +50,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "bicycle_theft.api:api",
         host="0.0.0.0",
-        port=8000,
-        reload=True,
+        port=int(os.environ.get("PORT", "8080")),
+        reload=bool(os.environ.get('RELOAD', False)),
         log_level="info",
     )
