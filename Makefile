@@ -26,4 +26,4 @@ train-cli:
 	python -m bicycle_theft.train
 
 predict-cli:
-	python -m bicycle_theft.cli ${items}
+	python -m bicycle_theft.predict ${items}
