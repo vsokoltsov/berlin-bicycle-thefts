@@ -35,6 +35,67 @@ The target is a non-negative count with many zeros and strong seasonality. Forec
 
 ## [Interactive map](https://vsokoltsov.github.io/berlin-bicycle-thefts/reports/eda_thefts_per_lor_map.html)
 
+## Project's diagramm
+
+```mermaid
+flowchart TB
+    %% Sources
+    subgraph Data["Initial Data"]
+        RAW["Raw data<br/>CSV / DB / API"]
+    end
+
+    %% Prepare
+    subgraph Prep["Data preparation"]
+        ETL["Load data"]
+        EDA["EDA<br/>Exploratory Data Analisys"]
+        FEATURES["Feature Engineering"]
+        SPLIT["Train/Test split"]
+    end
+
+    %% Training and tuning
+    subgraph Train["Train and tune"]
+        TRAINDATA["Prepare data"]
+        POISSON["Poisson-GLM"]
+        NEGATIVE["NegativeBinomial-GLM"]
+        LIGHTGBM["LightGBM"]
+        BEST["Select best model"]
+        OPTUNA["Optuna Study (LightGBM)"]
+        TRAINBEST["Train model with best parameters"]
+    end
+
+    %% Save artifacts
+    subgraph Artifacts["Artifacts"]
+        MODEL["Final model<br/>best_model"]
+        PARAMS["Best model params<br/>params.json"]
+        METRICS["Metrics<br/>preproc.json / plots"]
+    end
+
+    %% Inferenc
+    subgraph Inference["Inference"]
+        CLI["Script predict.py"]
+        API["FastAPI web service"]
+    end
+
+    RAW --> ETL --> EDA --> FEATURES --> SPLIT
+    SPLIT --> TRAINDATA
+    TRAINDATA --> POISSON
+    TRAINDATA --> NEGATIVE
+    TRAINDATA --> LIGHTGBM
+
+    POISSON --> BEST
+    NEGATIVE --> BEST
+    LIGHTGBM --> BEST
+
+    BEST --> OPTUNA
+    OPTUNA --> TRAINBEST
+
+    TRAINBEST --> MODEL
+    TRAINBEST --> PARAMS
+    TRAINBEST --> METRICS
+
+    MODEL --> Inference
+    METRICS --> Inference
+```
 
 ## Model selection
 
@@ -206,6 +267,11 @@ Parameters:
 
 * Platform: [Google Cloud Platform](https://cloud.google.com/free?hl=en)
 * [FastAPI](https://fastapi.tiangolo.com/) (Swagger): [https://bike-thefts-api-17407986606.europe-west3.run.app](https://bike-thefts-api-17407986606.europe-west3.run.app/docs)
+
+### How-to
+
+1. [Install gcloud CLI](https://docs.cloud.google.com/sdk/docs/install)
+2. Build docker image via
 
 ## Run project
 
