@@ -97,6 +97,18 @@ flowchart TB
     METRICS --> Inference
 ```
 
+## EDA (Brief)
+
+* From `01-01-2024` to `10-12-2025` **35729** thefts were registered with overall damage of **€45,126,876.000**
+* Top-3 districts by thefts are:
+  * Mitte (2466)
+  * Friedrichshain-Kreuzberg (1786)
+  * Pankow (1628)
+* Overall number of thefts has spikes on September of 2024 and May-June 2025
+* Not much correlation with percipitation
+* Seasonal correlation present
+* Most of thefts happens on Friday
+
 ## Model selection
 
 * [GLM Poisson](https://www.statsmodels.org/stable/generated/statsmodels.genmod.families.family.Poisson.html#statsmodels.genmod.families.family.Poisson)
@@ -271,9 +283,33 @@ Parameters:
 ### How-to
 
 1. [Install gcloud CLI](https://docs.cloud.google.com/sdk/docs/install)
-2. Build docker image via
+2. Set environment variables:
+   1. `PROJECT_ID`
+3. Build docker image and push it:
+   
+```bash
+gcloud builds submit \
+  --config cloudbuild.yaml \
+  --region=europe-west3 \
+  --project "$PROJECT_ID" \
+  --substitutions=_TAG=latest,_REPO=bike-thefts
+```
+
+4. Deploy docker image:
+   
+```bash
+cloud run deploy bike-thefts-api \
+  --image europe-west3-docker.pkg.dev/$PROJECT_ID/bike-thefts/bike-thefts-api:latest \
+  --region=europe-west3 --update-env-vars INTERIM_DIR=/tmp/data/interim --allow-unauthenticated --port=8080
+```
 
 ## Run project
+
+For the local project run, you would need to install:
+
+* [uv](https://docs.astral.sh/uv/guides/install-python/) - Python package manager
+* [Docker](https://www.docker.com/) - Containerization tool
+* [Docker-compose](https://docs.docker.com/compose/) - managing docker services tool
 
 ### Jupyter Notebooks
 
@@ -295,6 +331,7 @@ Parameters:
 * `uv sync`
 * Activate virtual environment via `source .venv/bin/activate`
 * `python -m bicycle_theft.api --host 0.0.0.0 --port ${PORT:-8080}`
+* Go to `http://localhost:8080/docs` - it would open Swagger interface for verifying the API calls
 
 #### Docker
 
