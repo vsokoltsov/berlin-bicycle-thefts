@@ -23,7 +23,7 @@ api:
 	docker-compose up api
 
 train-cli:
-	python bicycle_theft/train.py
+	python -m bicycle_theft.train
 
 predict-cli:
-	python bicycle_theft/cli.py ${items}
+	python -m bicycle_theft.cli ${items}
