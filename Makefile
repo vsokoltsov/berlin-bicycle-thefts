@@ -15,3 +15,15 @@ ruff:
 
 lint:
 	make mypy && make black && make ruff
+
+jupyter:
+	docker-compose up jupyter
+
+api:
+	docker-compose up api
+
+train-cli:
+	python bicycle_theft/train.py
+
+predict-cli:
+	python bicycle_theft/cli.py ${items}
