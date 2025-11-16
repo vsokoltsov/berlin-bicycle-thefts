@@ -1,8 +1,12 @@
 import os
+from typing import Any, Callable
+from pathlib import Path
 import json
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
+import optuna
+from functools import partial
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 import click
@@ -11,6 +15,57 @@ from .dataset import load_full_dataset
 from .features import FeatureManager
 
 from .config import PROCESSED_DATA
+
+def make_lgb_objective(X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    rate_train: pd.Series,
+    rate_test: pd.Series) -> Callable[optuna.Trial, Any | float]:
+
+    def objective(
+        trial: optuna.Trial
+    ) -> Any | float:
+        dtrain = lgb.Dataset(X_train, label=rate_train)
+        dvalid = lgb.Dataset(X_test, label=rate_test, reference=dtrain)
+
+        obj = trial.suggest_categorical("objective", ["tweedie", "poisson"])
+        params = {
+            "objective": obj,
+            "metric": "rmse",
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
+            "num_leaves": trial.suggest_int("num_leaves", 31, 255),
+            "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 10, 200),
+            "feature_fraction": trial.suggest_float("feature_fraction", 0.6, 1.0),
+            "bagging_fraction": trial.suggest_float("bagging_fraction", 0.6, 1.0),
+            "bagging_freq": trial.suggest_int("bagging_freq", 1, 7),
+            "lambda_l1": trial.suggest_float("lambda_l1", 1e-8, 10.0, log=True),
+            "lambda_l2": trial.suggest_float("lambda_l2", 1e-8, 10.0, log=True),
+            "max_depth": trial.suggest_int("max_depth", -1, 16),
+            "feature_pre_filter": False,
+            "verbosity": -1,
+            "seed": 42,
+            "force_row_wise": True
+        }
+        if obj == "tweedie":
+            params["tweedie_variance_power"] = trial.suggest_float("tweedie_variance_power", 1.1, 1.9)
+
+        model = lgb.train(
+            params,
+            dtrain,
+            valid_sets=[dtrain, dvalid],
+            valid_names=["train","val"],
+            num_boost_round=10000,
+            callbacks=[
+                lgb.early_stopping(stopping_rounds=200, verbose=False),
+                lgb.log_evaluation(period=100),
+            ]
+        )
+
+        trial.set_user_attr("best_iteration", int(model.best_iteration))
+        val_rate_pred = model.predict(X_test, num_iteration=model.best_iteration)
+        rmse_rate = mean_squared_error(rate_test, val_rate_pred) ** 0.5
+        return rmse_rate
+
+    return objective
 
 
 @click.command()
@@ -24,6 +79,12 @@ If dataset was already saved - returns file on disc
 """,
 )
 def train(force: bool) -> None:
+    best_model_params_file = Path(
+        os.path.join(PROCESSED_DATA, "best_model_params.json")
+    )
+    preproc_file = Path(
+        os.path.join(PROCESSED_DATA, "preproc.json")
+    )
     df = load_full_dataset(force)
     feature_manager = FeatureManager()
     df_full = feature_manager.build_causal(df)
@@ -93,23 +154,44 @@ def train(force: bool) -> None:
         os.path.join(PROCESSED_DATA, "X_train.geoparquet.gzip"), compression="gzip"
     )
     X_test.to_parquet(
-        os.path.join(PROCESSED_DATA, "X_train.geoparquet.gzip"), compression="gzip"
+        os.path.join(PROCESSED_DATA, "X_test.geoparquet.gzip"), compression="gzip"
     )
     print("Dataframes are saved!")
 
     X_train = X_train[feature_manager.columns]
     X_test = X_test[feature_manager.columns]
 
-    dtrain = lgb.Dataset(X_train, label=rate_train, feature_name=list(X_train.columns))
+    dtrain = lgb.Dataset(
+        X_train, label=rate_train, feature_name=list(X_train.columns)
+    )
     dtest = lgb.Dataset(
         X_test, label=rate_test, reference=dtrain, feature_name=list(X_train.columns)
     )
+    if not best_model_params_file.is_file() or not preproc_file.is_file():
+        print("Best model params files are not exist. Let us perfrom optuna optimizations...")
+        obj = make_lgb_objective(X_train, X_test, rate_train, rate_test)
+        study = optuna.create_study(direction="minimize", study_name="lgbm_biketheft")
+        study.optimize(obj, n_trials=50, show_progress_bar=True)
 
-    with open(os.path.join(PROCESSED_DATA, "best_model_params.json"), "r") as f:
-        best_params = json.load(f)
+        best_params = study.best_params.copy()
+        best_params.update(dict(metric="rmse", verbosity=-1, seed=42, force_row_wise=True))
+        with open(os.path.join(PROCESSED_DATA, "best_model_params.json"), "w") as f:
+            json.dump(best_params, f, ensure_ascii=False, indent=2)
+        best_n = int(study.best_trial.user_attrs.get("best_iteration"))
+        preproc_params = {
+            "feature_columns": list(X_trval.columns),
+            "median_imputer": imp.to_dict(),
+            "zero_like_cols": zero_like_cols,
+            "best_iteration": best_n,
+        }
+        with open(os.path.join(PROCESSED_DATA, "preproc.json"), "w") as f:
+            json.dump(preproc_params, f, ensure_ascii=False, indent=2)
+    else:
+        with open(best_model_params_file, "r") as f:
+            best_params = json.load(f)
 
-    with open(os.path.join(PROCESSED_DATA, "preproc.json"), "r") as f:
-        preproc_params = json.load(f)
+        with open(preproc_file, "r") as f:
+            preproc_params = json.load(f)
 
     best_n = preproc_params.get("best_iteration", 2827)
     print("PREPROC PARAMS ARE", preproc_params)
@@ -129,20 +211,10 @@ def train(force: bool) -> None:
         mean_absolute_error(y_test, cnt_pred_test),
         mean_squared_error(y_test, cnt_pred_test) ** 0.5,
     )
-
-    print("Saving model...")
-    artifacts = {
-        "feature_columns": list(X_train.columns),
-        "median_imputer": imp.to_dict(),
-        "zero_like_cols": zero_like_cols,
-        "best_iteration": best_n,
-    }
     gbm_final.save_model(
         os.path.join(PROCESSED_DATA, "bike_thefts_lgbm.pkl"),
         num_iteration=gbm_final.best_iteration,
     )
-    with open(os.path.join(PROCESSED_DATA, "preproc.json"), "w") as f:
-        json.dump(artifacts, f, ensure_ascii=False, indent=2)
     print("Model is saved!")
 
 
